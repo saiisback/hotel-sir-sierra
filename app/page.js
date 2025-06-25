@@ -3,120 +3,97 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ShoppingCart, Plus, Minus, Check, ArrowLeft, Star, Clock, Flame, Leaf, Award, Phone, User, Search, Filter } from "lucide-react"
+import { createClient } from '@supabase/supabase-js'
 
-// Simulated database functions (replace with actual Supabase calls)
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+
+// Database operations using Supabase
 const dbOperations = {
   // Get all menu items
   getMenuItems: async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return [
-      {
-        id: "1",
-        name: "Butter Chicken",
-        description: "Creamy tomato-based curry with tender chicken pieces, aromatic spices",
-        price: 16.99,
-        category: "Mains",
-        image_url: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop",
-        rating: 4.8,
-        is_bestseller: true,
-        is_vegetarian: false,
-        is_spicy: true,
-      },
-      {
-        id: "2",
-        name: "Paneer Tikka Masala",
-        description: "Grilled cottage cheese in rich, creamy tomato gravy with bell peppers",
-        price: 14.99,
-        category: "Mains",
-        image_url: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&h=300&fit=crop",
-        rating: 4.7,
-        is_bestseller: false,
-        is_vegetarian: true,
-        is_spicy: true,
-      },
-      {
-        id: "3",
-        name: "Chicken Biryani",
-        description: "Fragrant basmati rice layered with spiced chicken, saffron & crispy onions",
-        price: 18.99,
-        category: "Rice & Biryani",
-        image_url: "https://images.unsplash.com/photo-1563379091339-03246963d51a?w=400&h=300&fit=crop",
-        rating: 4.9,
-        is_bestseller: true,
-        is_vegetarian: false,
-        is_spicy: true,
-      },
-      {
-        id: "4",
-        name: "Samosa",
-        description: "Crispy triangular pastry filled with spiced potatoes and peas",
-        price: 5.99,
-        category: "Starters",
-        image_url: "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400&h=300&fit=crop",
-        rating: 4.6,
-        is_bestseller: false,
-        is_vegetarian: true,
-        is_spicy: false,
-      },
-      {
-        id: "5",
-        name: "Garlic Naan",
-        description: "Fresh-baked bread topped with aromatic garlic and coriander",
-        price: 3.99,
-        category: "Breads",
-        image_url: "https://images.unsplash.com/photo-1574653531215-d3186707eadb?w=400&h=300&fit=crop",
-        rating: 4.5,
-        is_bestseller: false,
-        is_vegetarian: true,
-        is_spicy: false,
-      },
-      {
-        id: "6",
-        name: "Gulab Jamun",
-        description: "Soft milk dumplings soaked in cardamom-flavored sugar syrup",
-        price: 6.99,
-        category: "Desserts",
-        image_url: "https://images.unsplash.com/photo-1558742292-92334d5cce72?w=400&h=300&fit=crop",
-        rating: 4.7,
-        is_bestseller: false,
-        is_vegetarian: true,
-        is_spicy: false,
-      },
-      {
-        id: "7",
-        name: "Mango Lassi",
-        description: "Refreshing yogurt drink blended with sweet mango pulp",
-        price: 4.99,
-        category: "Beverages",
-        image_url: "https://images.unsplash.com/photo-1553979459-d2229ba7433a?w=400&h=300&fit=crop",
-        rating: 4.4,
-        is_bestseller: false,
-        is_vegetarian: true,
-        is_spicy: false,
-      },
-    ]
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .order('category, name')
+      
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error fetching menu items:', error)
+      throw error
+    }
   },
 
-  // Create or get user
+  // Create or get user by mobile number
   createUser: async (userData) => {
-    await new Promise(resolve => setTimeout(resolve, 300))
-    return {
-      id: "user-123",
-      full_name: userData.fullName,
-      mobile: userData.mobile,
-      created_at: new Date().toISOString()
+    try {
+      // First check if user exists by mobile
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('mobile', userData.mobile)
+        .single()
+
+      if (existingUser) {
+        // Update existing user's name if different
+        if (existingUser.full_name !== userData.fullName) {
+          const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update({ full_name: userData.fullName })
+            .eq('id', existingUser.id)
+            .select()
+            .single()
+          
+          if (updateError) throw updateError
+          return updatedUser
+        }
+        return existingUser
+      }
+
+      // Create new user
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([{
+          full_name: userData.fullName,
+          mobile: userData.mobile
+        }])
+        .select()
+        .single()
+
+      if (createError) throw createError
+      return newUser
+    } catch (error) {
+      console.error('Error creating/updating user:', error)
+      throw error
     }
   },
 
   // Create order
   createOrder: async (orderData) => {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return {
-      id: "order-" + Date.now(),
-      ...orderData,
-      status: 'confirmed',
-      created_at: new Date().toISOString()
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([{
+          user_id: orderData.user_id,
+          items: orderData.items,
+          total_amount: orderData.total_amount,
+          pickup_time: orderData.pickup_time,
+          kitchen_note: orderData.kitchen_note || null,
+          upi_transaction_id: orderData.upi_transaction_id,
+          status: 'confirmed'
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Error creating order:', error)
+      throw error
     }
   }
 }
@@ -126,6 +103,7 @@ const categories = ["Starters", "Mains", "Rice & Biryani", "Breads", "Desserts",
 export default function SriSierraOrdering() {
   const [currentStep, setCurrentStep] = useState("login")
   const [userData, setUserData] = useState({ fullName: "", mobile: "" })
+  const [currentUser, setCurrentUser] = useState(null)
   const [menuItems, setMenuItems] = useState([])
   const [activeCategory, setActiveCategory] = useState("Starters")
   const [cartItems, setCartItems] = useState([])
@@ -146,10 +124,20 @@ export default function SriSierraOrdering() {
   const loadMenuItems = async () => {
     try {
       setLoading(true)
+      setError("")
       const items = await dbOperations.getMenuItems()
       setMenuItems(items)
+      
+      // Set first available category as active if current one has no items
+      if (items.length > 0) {
+        const availableCategories = [...new Set(items.map(item => item.category))]
+        if (!availableCategories.includes(activeCategory)) {
+          setActiveCategory(availableCategories[0])
+        }
+      }
     } catch (err) {
-      setError("Failed to load menu items")
+      setError("Failed to load menu items. Please try again.")
+      console.error("Menu loading error:", err)
     } finally {
       setLoading(false)
     }
@@ -188,18 +176,29 @@ export default function SriSierraOrdering() {
   }
 
   const handleLogin = async () => {
-    if (!userData.fullName || !userData.mobile) {
+    if (!userData.fullName.trim() || !userData.mobile.trim()) {
       setError("Please fill in all fields")
+      return
+    }
+    
+    // Basic mobile number validation
+    if (!/^\d{10,15}$/.test(userData.mobile.replace(/\s+/g, ''))) {
+      setError("Please enter a valid mobile number")
       return
     }
     
     try {
       setLoading(true)
       setError("")
-      await dbOperations.createUser(userData)
+      const user = await dbOperations.createUser({
+        fullName: userData.fullName.trim(),
+        mobile: userData.mobile.replace(/\s+/g, '')
+      })
+      setCurrentUser(user)
       setCurrentStep("menu")
     } catch (err) {
-      setError("Failed to create user profile")
+      setError("Failed to create user profile. Please try again.")
+      console.error("User creation error:", err)
     } finally {
       setLoading(false)
     }
@@ -210,30 +209,55 @@ export default function SriSierraOrdering() {
       setError("Please select a pickup time")
       return
     }
+    
+    // Validate pickup time is not in the past
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const selectedDateTime = new Date(`${today}T${pickupTime}`)
+    
+    if (selectedDateTime <= now) {
+      setError("Please select a future pickup time")
+      return
+    }
+    
     setError("")
     setCurrentStep("payment")
   }
 
   const handlePayment = async () => {
-    if (!upiTransactionId) {
+    if (!upiTransactionId.trim()) {
       setError("Please enter UPI transaction ID")
+      return
+    }
+
+    if (!currentUser) {
+      setError("User information not found. Please restart the process.")
       return
     }
 
     try {
       setLoading(true)
       setError("")
-      await dbOperations.createOrder({
-        user_id: "user-123",
-        items: cartItems,
+      
+      const orderData = {
+        user_id: currentUser.id,
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        })),
         total_amount: finalTotal,
         pickup_time: pickupTime,
-        kitchen_note: kitchenNote,
-        upi_transaction_id: upiTransactionId
-      })
+        kitchen_note: kitchenNote.trim() || null,
+        upi_transaction_id: upiTransactionId.trim()
+      }
+      
+      await dbOperations.createOrder(orderData)
       setCurrentStep("success")
     } catch (err) {
-      setError("Payment failed. Please try again.")
+      setError("Payment failed. Please verify your transaction ID and try again.")
+      console.error("Order creation error:", err)
     } finally {
       setLoading(false)
     }
@@ -247,13 +271,20 @@ export default function SriSierraOrdering() {
   const resetApp = () => {
     setCurrentStep("login")
     setCartItems([])
+    setCurrentUser(null)
     setUserData({ fullName: "", mobile: "" })
     setPickupTime("")
     setKitchenNote("")
     setUpiTransactionId("")
     setSearchQuery("")
     setError("")
+    setActiveCategory("Starters")
   }
+
+  // Get unique categories from loaded menu items
+  const availableCategories = [...new Set(menuItems.map(item => item.category))].filter(cat => 
+    categories.includes(cat)
+  ).sort((a, b) => categories.indexOf(a) - categories.indexOf(b))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -312,6 +343,7 @@ export default function SriSierraOrdering() {
                         onChange={(e) => setUserData({ ...userData, fullName: e.target.value })}
                         className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         placeholder="Full Name"
+                        disabled={loading}
                       />
                     </div>
                   </div>
@@ -324,6 +356,7 @@ export default function SriSierraOrdering() {
                         onChange={(e) => setUserData({ ...userData, mobile: e.target.value })}
                         className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         placeholder="Mobile Number"
+                        disabled={loading}
                       />
                     </div>
                   </div>
@@ -389,7 +422,7 @@ export default function SriSierraOrdering() {
             {/* Categories */}
             <div className="sticky top-24 z-40 bg-white border-b border-gray-100 px-4 py-3">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                {categories.map((category) => (
+                {availableCategories.map((category) => (
                   <motion.button
                     key={category}
                     whileTap={{ scale: 0.95 }}
@@ -406,11 +439,26 @@ export default function SriSierraOrdering() {
               </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="px-4 py-2">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              </div>
+            )}
+
             {/* Menu Items */}
             <div className="px-4 py-4 pb-24">
               {loading ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">
+                    {searchQuery ? "No dishes found matching your search." : "No items available in this category."}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -479,7 +527,7 @@ export default function SriSierraOrdering() {
                           </div>
                           <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
                             <img
-                              src={item.image_url}
+                              src={item.image_url || "/placeholder.svg?height=96&width=96"}
                               alt={item.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -557,7 +605,7 @@ export default function SriSierraOrdering() {
                           {cartItems.map((item) => (
                             <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                               <img
-                                src={item.image_url}
+                                src={item.image_url || "/placeholder.svg?height=48&width=48"}
                                 alt={item.name}
                                 className="w-12 h-12 rounded-lg object-cover"
                                 onError={(e) => {
@@ -753,6 +801,7 @@ export default function SriSierraOrdering() {
                   onChange={(e) => setUpiTransactionId(e.target.value)}
                   placeholder="Enter UPI Transaction ID"
                   className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent mb-4"
+                  disabled={loading}
                 />
                 <motion.button
                   whileTap={{ scale: 0.98 }}
