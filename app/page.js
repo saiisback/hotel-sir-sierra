@@ -325,6 +325,7 @@ export default function SriSierraOrdering() {
                   </motion.div>
                   <h1 className="text-3xl font-bold text-gray-800 mb-2">Sri Sierra</h1>
                   <p className="text-gray-600">Pre-Ordering System</p>
+                  <p className="text-gray-600">Made by Margros</p>
                 </div>
 
                 {error && (
